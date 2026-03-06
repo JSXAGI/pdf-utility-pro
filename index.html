@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Utility Pro - Final Refined</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://unpkg.com/docx@7.8.2/build/index.js"></script>
+    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+    
+    <style>
+        :root { --primary: #1a73e8; --bg: #f1f3f4; --card: #ffffff; }
+        body { font-family: 'Segoe UI', 'Meiryo', sans-serif; background-color: var(--bg); padding: 40px 20px; color: #3c4043; }
+        .container { max-width: 1100px; margin: 0 auto; }
+        header { text-align: center; margin-bottom: 40px; }
+        header h1 { color: var(--primary); font-size: 2.4rem; margin: 0; letter-spacing: -1px; }
+        .badge { background: #fff; color: #5f6368; padding: 5px 15px; border-radius: 20px; font-size: 0.85rem; border: 1px solid #dadce0; margin-top: 10px; display: inline-block; }
+        
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+        .card { background: var(--card); border-radius: 12px; padding: 25px; box-shadow: 0 1px 3px rgba(0,0,0,0.12); border: 1px solid #dadce0; }
+        .card h3 { color: #202124; margin-top: 0; font-size: 1.25rem; display: flex; align-items: center; gap: 10px; }
+        .card p { font-size: 0.85rem; color: #5f6368; min-height: 3em; }
+
+        /* 特大カード（画像変換用） */
+        .card-large { grid-column: span 2; display: flex; gap: 25px; align-items: flex-start; }
+        @media (max-width: 800px) { .card-large { grid-column: span 1; flex-direction: column; } }
+        
+        .logo-upload-box { background: #f8f9fa; border: 2px dashed #bdc1c6; padding: 15px; border-radius: 8px; width: 220px; text-align: center; }
+        #logoPreview { max-width: 100%; max-height: 80px; margin-top: 10px; display: none; border-radius: 4px; }
+
+        /* ステータス & プレビュー */
+        #status-panel { display: none; background: white; border-radius: 12px; padding: 30px; text-align: center; margin: 25px 0; border: 1px solid var(--primary); }
+        progress { width: 100%; height: 12px; border-radius: 6px; margin: 15px 0; }
+        
+        #preview-section { display: none; margin-top: 30px; background: white; padding: 25px; border-radius: 12px; border: 1px solid #dadce0; }
+        .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 15px; margin-top: 20px; }
+        .img-card { border: 1px solid #f1f3f4; padding: 10px; text-align: center; border-radius: 8px; background: #fff; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .img-card img { max-width: 100%; height: auto; border: 1px solid #eee; }
+        
+        .btn { background: var(--primary); color: white; border: none; padding: 12px 24px; border-radius: 4px; cursor: pointer; font-weight: 500; text-decoration: none; display: inline-block; font-size: 0.9rem; }
+        .btn:hover { background: #1765cc; }
+        .btn-sub { background: #f1f3f4; color: #1a73e8; border: 1px solid #dadce0; margin-top: 8px; padding: 5px 12px; font-size: 0.75rem; border-radius: 4px; cursor: pointer; }
+        
+        input[type="file"] { font-size: 0.8rem; margin-top: 10px; }
+        footer { text-align: center; margin-top: 50px; color: #70757a; font-size: 0.75rem; border-top: 1px solid #dadce0; padding-top: 20px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>PDF Utility Pro</h1>
+        <div class="badge">🛡️ ローカル処理（データ送信なし）</div>
+    </header>
+
+    <div class="grid">
+        <div class="card card-large">
+            <div style="flex: 1;">
+                <h3>🖼️ 画像変換 ＆ ロゴ挿入</h3>
+                <p>PDFを画像(PNG)に変換します。変換後、1枚ずつ保存するか、まとめてZIP保存するか選べます。</p>
+                <input type="file" id="toImage" accept="application/pdf">
+            </div>
+            <div class="logo-upload-box">
+                <span style="font-size: 0.75rem; font-weight: bold; color: #5f6368;">透かし用ロゴ(任意)</span>
+                <input type="file" id="logoInput" accept="image/*" style="width: 180px;">
+                <img id="logoPreview">
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>📝 高品質Word抽出</h3>
+            <p>改行や段落、ページ区切りを可能な限り再現してWord形式で書き出します。</p>
+            <input type="file" id="toWord" accept="application/pdf">
+        </div>
+
+        <div class="card">
+            <h3>🔗 PDF結合</h3>
+            <p>複数のPDFファイルを選択して、1つのファイルにまとめます。</p>
+            <input type="file" id="toMerge" accept="application/pdf" multiple>
+        </div>
+
+        <div class="card">
+            <h3>🧹 匿名化</h3>
+            <p>PDFファイルから作成者情報やタイトルなどのメタデータを消去します。</p>
+            <input type="file" id="toClean" accept="application/pdf">
+        </div>
+    </div>
+
+    <div id="status-panel">
+        <h2 id="status-text" style="margin:0; font-size: 1.2rem;">Ready</h2>
+        <progress id="mainBar" value="0" max="100"></progress>
+        <div id="dl-area"></div>
+    </div>
+
+    <div id="preview-section">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+            <h3>変換済み画像プレビュー</h3>
+            <button class="btn btn-sub" onclick="location.reload()">× 閉じる</button>
+        </div>
+        <p style="font-size: 0.8rem; color: #666;">※ZIP保存がブロックされる場合は、下のボタンから1枚ずつ保存してください。</p>
+        <div id="gallery" class="gallery"></div>
+    </div>
+
+    <footer>
+        &copy; 2024 Private PDF App - 安全なローカル環境でのみ動作します。
+    </footer>
+</div>
+
+<script>
+    const pdfjsLib = window['pdfjs-dist/build/pdf'];
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+    let logoImg = null;
+
+    // ロゴ画像の設定
+    document.getElementById('logoInput').onchange = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                const img = new Image();
+                img.src = ev.target.result;
+                img.onload = () => {
+                    logoImg = img;
+                    const preview = document.getElementById('logoPreview');
+                    preview.src = ev.target.result;
+                    preview.style.display = 'block';
+                };
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
+    function uiStart(msg) {
+        document.getElementById('status-panel').style.display = 'block';
+        document.getElementById('status-text').innerText = msg;
+        document.getElementById('dl-area').innerHTML = '';
+        document.getElementById('mainBar').value = 0;
+        document.getElementById('preview-section').style.display = 'none';
+    }
+
+    function uiDone(msg, html) {
+        document.getElementById('status-text').innerText = msg;
+        document.getElementById('dl-area').innerHTML = html;
+        document.getElementById('mainBar').value = 100;
+    }
+
+    // ① 画像変換エンジン
+    document.getElementById('toImage').onchange = async (e) => {
+        const file = e.target.files[0]; if (!file) return;
+        uiStart("画像を生成中...");
+        const zip = new JSZip();
+        const gallery = document.getElementById('gallery');
+        gallery.innerHTML = '';
+
+        try {
+            const pdf = await pdfjsLib.getDocument(await file.arrayBuffer()).promise;
+            for (let i = 1; i <= pdf.numPages; i++) {
+                const page = await pdf.getPage(i);
+                const viewport = page.getViewport({ scale: 2.0 });
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                canvas.height = viewport.height; canvas.width = viewport.width;
+                await page.render({ canvasContext: ctx, viewport }).promise;
+
+                if (logoImg) {
+                    const lw = viewport.width * 0.15;
+                    const lh = (logoImg.height / logoImg.width) * lw;
+                    ctx.globalAlpha = 0.5;
+                    ctx.drawImage(logoImg, viewport.width - lw - 20, viewport.height - lh - 20, lw, lh);
+                }
+
+                const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
+                const url = URL.createObjectURL(blob);
+                zip.file(`page_${i}.png`, blob);
+
+                const div = document.createElement('div');
+                div.className = 'img-card';
+                div.innerHTML = `<img src="${url}"><br><a href="${url}" download="page_${i}.png" class="btn btn-sub">このページを保存</a>`;
+                gallery.appendChild(div);
+                document.getElementById('mainBar').value = (i / pdf.numPages) * 100;
+            }
+            const zipUrl = URL.createObjectURL(await zip.generateAsync({ type: "blob" }));
+            uiDone("生成完了！", `<a href="${zipUrl}" download="images.zip" class="btn">まとめてZIP保存</a>`);
+            document.getElementById('preview-section').style.display = 'block';
+        } catch (err) { alert(err); }
+    };
+
+    // ② 高品質Word抽出エンジン (座標計算・段落再現)
+    document.getElementById('toWord').onchange = async (e) => {
+        const file = e.target.files[0]; if (!file) return;
+        uiStart("高品質テキスト解析中...");
+        try {
+            const pdf = await pdfjsLib.getDocument(await file.arrayBuffer()).promise;
+            const sections = [];
+            
+            for (let i = 1; i <= pdf.numPages; i++) {
+                const page = await pdf.getPage(i);
+                const textContent = await page.getTextContent();
+                let lastY, pageParagraphs = [], currentLine = "";
+
+                // 座標(Y方向)を基準に段落・改行を判別するロジック
+                for (let item of textContent.items) {
+                    // 高さの差が一定以上あれば改行とみなす
+                    if (lastY !== undefined && Math.abs(item.transform[5] - lastY) > 5) {
+                        pageParagraphs.push(new docx.Paragraph({
+                            children: [new docx.TextRun({ text: currentLine, font: "MS Mincho" })],
+                            spacing: { after: 120 }
+                        }));
+                        currentLine = "";
+                    }
+                    currentLine += item.str;
+                    lastY = item.transform[5];
+                }
+                
+                // 最後の行を追加
+                pageParagraphs.push(new docx.Paragraph({
+                    children: [new docx.TextRun({ text: currentLine, font: "MS Mincho" })]
+                }));
+
+                // 最終ページ以外にはページ区切りを挿入
+                if (i < pdf.numPages) {
+                    pageParagraphs.push(new docx.Paragraph({ children: [new docx.PageBreak()] }));
+                }
+                
+                sections.push(...pageParagraphs);
+                document.getElementById('mainBar').value = (i / pdf.numPages) * 100;
+            }
+
+            const doc = new docx.Document({
+                sections: [{ children: sections }]
+            });
+
+            const blob = await docx.Packer.toBlob(doc);
+            const url = URL.createObjectURL(blob);
+            uiDone("Word作成完了！", `<a href="${url}" download="${file.name.replace('.pdf', '.docx')}" class="btn">Wordを保存</a>`);
+        } catch (err) { alert(err); }
+    };
+
+    // ③ PDF結合
+    document.getElementById('toMerge').onchange = async (e) => {
+        const files = Array.from(e.target.files); if (files.length < 2) return;
+        uiStart("PDFを結合中...");
+        try {
+            const merged = await PDFLib.PDFDocument.create();
+            for (const f of files) {
+                const doc = await PDFLib.PDFDocument.load(await f.arrayBuffer());
+                const pages = await merged.copyPages(doc, doc.getPageIndices());
+                pages.forEach(p => merged.addPage(p));
+            }
+            const blob = new Blob([await merged.save()], { type: 'application/pdf' });
+            uiDone("結合完了！", `<a href="${URL.createObjectURL(blob)}" download="merged.pdf" class="btn">結合PDFを保存</a>`);
+        } catch (err) { alert(err); }
+    };
+
+    // ④ 匿名化
+    document.getElementById('toClean').onchange = async (e) => {
+        const file = e.target.files[0]; if (!file) return;
+        uiStart("メタデータ削除中...");
+        try {
+            const doc = await PDFLib.PDFDocument.load(await file.arrayBuffer());
+            doc.setTitle(''); doc.setAuthor(''); doc.setSubject(''); doc.setCreator(''); doc.setProducer('');
+            const blob = new Blob([await doc.save()], { type: 'application/pdf' });
+            uiDone("完了！", `<a href="${URL.createObjectURL(blob)}" download="cleaned.pdf" class="btn">保存</a>`);
+        } catch (err) { alert(err); }
+    };
+</script>
+</body>
+</html>
