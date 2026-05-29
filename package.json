@@ -1,0 +1,22 @@
+{
+  "name": "pdf-utility-pro",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "pdfjs-dist": "^4.5.136",
+    "pdf-lib": "^1.17.1",
+    "docx": "^8.5.0",
+    "jszip": "^3.10.1"
+  },
+  "devDependencies": {
+    "vite": "^6.0.0",
+    "@vite-pwa/assets-generator": "^0.2.6",
+    "vite-plugin-pwa": "^0.21.0"
+  }
+}
+
