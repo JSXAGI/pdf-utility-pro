@@ -1,14 +1,25 @@
 importScripts('https://storage.googleapis.com/workbox-cdn/releases/7.0.0/workbox-sw.js');
 
 const { registerRoute } = workbox.routing;
-const { CacheFirst, NetworkFirst } = workbox.strategies;
+const { NetworkFirst, CacheFirst } = workbox.strategies;
 
-// UIリソースはキャッシュから優先的に読み込み
-registerRoute(({request}) => request.destination === 'document' || request.destination === 'script',
-  new NetworkFirst({ cacheName: 'static-resources' })
+// 1. ドキュメントやスクリプトは「まずはネットワーク、ダメならキャッシュ」
+registerRoute(
+  ({request}) => request.destination === 'document' || request.destination === 'script' || request.destination === 'style',
+  new NetworkFirst({
+    cacheName: 'static-resources',
+  })
 );
 
-// インストール時にキャッシュをクリーンアップ
+// 2. アイコンや画像は「キャッシュから読み込み、なければネットワーク」
+registerRoute(
+  ({request}) => request.destination === 'image',
+  new CacheFirst({
+    cacheName: 'image-cache',
+  })
+);
+
+// インストール時には何も消さない（キャッシュを維持する）
 self.addEventListener('activate', (event) => {
-  event.waitUntil(caches.delete('static-resources'));
+  event.waitUntil(self.clients.claim());
 });
