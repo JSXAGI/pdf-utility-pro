@@ -11,9 +11,13 @@ const pdfjsLib = pdfjsModule.default || pdfjsModule;
 
 // 【完全なWorker無効化設定】
 // ブラウザ環境でのrequireエラーを回避するため、Workerを完全に無効化し、
-// メインスレッドでPDF処理を完結させる設定です。
+// Worker関連の機能を完全に無効化し、かつダミーのポートを割り当てる
+pdfjsLib.GlobalWorkerOptions.workerSrc = ''; 
 pdfjsLib.GlobalWorkerOptions.workerPort = null;
-pdfjsLib.disableWorker = true;
+// さらに、Workerを使おうとするすべての機能を強制オフにする
+if (typeof window !== 'undefined') {
+    pdfjsLib.disableWorker = true;
+}
 
 // ==========================================
 // 2. 共通のUI制御関数
