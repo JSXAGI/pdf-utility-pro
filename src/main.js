@@ -1,16 +1,19 @@
 // ==========================================
-// 1. ライブラリのインポート（地図から呼び出す）
+// 1. ライブラリのインポート
 // ==========================================
 import * as pdfjsModule from 'pdfjs-dist';
 import { PDFDocument } from 'pdf-lib';
 import * as docx from 'docx';
 import JSZip from 'jszip';
 
-// 【修正の要】箱（default）に入って届いた場合は中身を取り出す
+// 箱（default）に入って届いた場合は中身を取り出す
 const pdfjsLib = pdfjsModule.default || pdfjsModule;
 
-// Workerのパス設定（確実な公式CDNバージョンを指定）
+// 【完全なWorker無効化設定】
+// ブラウザ環境でのrequireエラーを回避するため、Workerを完全に無効化し、
+// メインスレッドでPDF処理を完結させる設定です。
 pdfjsLib.GlobalWorkerOptions.workerPort = null;
+pdfjsLib.disableWorker = true;
 
 // ==========================================
 // 2. 共通のUI制御関数
@@ -126,7 +129,7 @@ document.getElementById('toWord').addEventListener('change', async (e) => {
 
             for (let y of sortedY) {
                 const rowText = lines[y].sort((a, b) => a.transform[4] - b.transform[4])
-                                       .map(item => item.str).join('');
+                                         .map(item => item.str).join('');
                 
                 if (rowText.trim().length === 0) continue;
 
