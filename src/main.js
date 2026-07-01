@@ -10,7 +10,7 @@ import JSZip from 'jszip';
 const pdfjsLib = pdfjsModule.default || pdfjsModule;
 
 // Workerのパス設定（確実な公式CDNバージョンを指定）
-pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://esm.run/pdfjs-dist@3.11.174/build/pdf.worker.js';
+pdfjsLib.GlobalWorkerOptions.workerPort = null;
 
 // ==========================================
 // 2. 共通のUI制御関数
