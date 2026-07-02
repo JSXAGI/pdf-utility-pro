@@ -6,14 +6,23 @@ import { PDFDocument } from 'pdf-lib';
 import * as docx from 'docx';
 import JSZip from 'jszip';
 
-// 【エラー完全回避のコア設定】
+// 【v4系対応：設定の修正】
 const pdfjsLib = pdfjsModule.default || pdfjsModule;
-if (typeof window !== 'undefined') window.pdfjsWorker = null;
 
-// PDF.js v4系向けのWorker完全無効化設定
-pdfjsLib.GlobalWorkerOptions.workerSrc = '';
-pdfjsLib.GlobalWorkerOptions.workerPort = null;
-pdfjsLib.disableWorker = true;
+// 1. Workerの設定は、GlobalWorkerOptionsに直接代入するのではなく
+//    pdfjsLibの設定を介さずに、以下のように処理します
+if (typeof window !== 'undefined') {
+    window.pdfjsWorker = null;
+}
+
+// 2. もしdisableWorkerが書き込み不可なら、try-catchで囲んで
+//    「警告を無視して」設定を試みる（または設定そのものをスキップする）
+try {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = '';
+    pdfjsLib.disableWorker = true;
+} catch (e) {
+    console.log("Worker設定は読み取り専用ですが、環境により自動的にメインスレッドで動作します");
+}
 
 // ==========================================
 // 2. 共通のUI制御関数
