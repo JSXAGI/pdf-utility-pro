@@ -6,13 +6,10 @@ import { PDFDocument } from 'pdf-lib';
 import * as docx from 'docx';
 import JSZip from 'jszip';
 
-// PDF.jsのWorker設定を完全に遮断する設定（エラー回避の決定版）
+// 【エラー完全回避のコア設定】
 const pdfjsLib = pdfjsModule.default || pdfjsModule;
-
-if (typeof window !== 'undefined') {
-    window.pdfjsWorker = null;
-}
-pdfjsLib.GlobalWorkerOptions.workerSrc = ''; 
+if (typeof window !== 'undefined') window.pdfjsWorker = null;
+pdfjsLib.GlobalWorkerOptions.workerSrc = '';
 pdfjsLib.GlobalWorkerOptions.workerPort = null;
 pdfjsLib.disableWorker = true;
 
@@ -22,31 +19,24 @@ pdfjsLib.disableWorker = true;
 let logoImg = null;
 
 function uiStart(msg) {
-    const statusPanel = document.getElementById('status-panel');
-    if (statusPanel) statusPanel.style.display = 'block';
-    const statusText = document.getElementById('status-text');
-    if (statusText) statusText.innerText = msg;
-    const dlArea = document.getElementById('dl-area');
-    if (dlArea) dlArea.innerHTML = '';
-    const mainBar = document.getElementById('mainBar');
-    if (mainBar) mainBar.value = 0;
-    const previewSection = document.getElementById('preview-section');
-    if (previewSection) previewSection.style.display = 'none';
+    document.getElementById('status-panel').style.display = 'block';
+    document.getElementById('status-text').innerText = msg;
+    document.getElementById('dl-area').innerHTML = '';
+    document.getElementById('mainBar').value = 0;
+    document.getElementById('preview-section').style.display = 'none';
 }
 
 function uiDone(msg, html) {
-    const statusText = document.getElementById('status-text');
-    if (statusText) statusText.innerText = msg;
-    const dlArea = document.getElementById('dl-area');
-    if (dlArea) dlArea.innerHTML = html;
-    const mainBar = document.getElementById('mainBar');
-    if (mainBar) mainBar.value = 100;
+    document.getElementById('status-text').innerText = msg;
+    document.getElementById('dl-area').innerHTML = html;
+    document.getElementById('mainBar').value = 100;
 }
 
 // ==========================================
 // 3. 各機能のイベントリスナー
 // ==========================================
 
+// ロゴ画像の読み込み
 document.getElementById('logoInput').addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -57,23 +47,21 @@ document.getElementById('logoInput').addEventListener('change', (e) => {
             img.onload = () => {
                 logoImg = img;
                 const preview = document.getElementById('logoPreview');
-                if (preview) {
-                    preview.src = ev.target.result;
-                    preview.style.display = 'block';
-                }
+                preview.src = ev.target.result;
+                preview.style.display = 'block';
             };
         };
         reader.readAsDataURL(file);
     }
 });
 
-// ① 画像変換
+// ① 画像変換エンジン
 document.getElementById('toImage').addEventListener('change', async (e) => {
     const file = e.target.files[0]; if (!file) return;
     uiStart("画像を生成中...");
     const zip = new JSZip();
     const gallery = document.getElementById('gallery');
-    if (gallery) gallery.innerHTML = '';
+    gallery.innerHTML = '';
 
     try {
         const pdf = await pdfjsLib.getDocument(await file.arrayBuffer()).promise;
@@ -100,59 +88,81 @@ document.getElementById('toImage').addEventListener('change', async (e) => {
             const div = document.createElement('div');
             div.className = 'img-card';
             div.innerHTML = `<img src="${url}"><br><a href="${url}" download="${fileName}" class="btn btn-sub btn-small">保存</a>`;
-            if (gallery) gallery.appendChild(div);
-            const mainBar = document.getElementById('mainBar');
-            if (mainBar) mainBar.value = (i / pdf.numPages) * 100;
+            gallery.appendChild(div);
+            document.getElementById('mainBar').value = (i / pdf.numPages) * 100;
         }
         const zipContent = await zip.generateAsync({ type: "blob", compression: "DEFLATE", compressionOptions: { level: 6 } });
         const zipUrl = URL.createObjectURL(zipContent);
         uiDone("完了！", `<a href="${zipUrl}" download="pdf_images.zip" class="btn">まとめて保存 (ZIP)</a>`);
-        const previewSection = document.getElementById('preview-section');
-        if (previewSection) previewSection.style.display = 'block';
+        document.getElementById('preview-section').style.display = 'block';
     } catch (err) { 
         console.error(err);
         alert("エラー: " + err.message); 
     }
 });
 
-// ② Word抽出
+// ② 高品質Word抽出エンジン
 document.getElementById('toWord').addEventListener('change', async (e) => {
     const file = e.target.files[0]; if (!file) return;
     uiStart("精密テキスト接着中...");
     try {
         const pdf = await pdfjsLib.getDocument(await file.arrayBuffer()).promise;
         const allDocChildren = [];
+
         for (let i = 1; i <= pdf.numPages; i++) {
             const page = await pdf.getPage(i);
             const textContent = await page.getTextContent();
+            
             const lines = {};
             textContent.items.forEach(item => {
                 const y = Math.round(item.transform[5] / 5) * 5;
                 if (!lines[y]) lines[y] = [];
                 lines[y].push(item);
             });
+
             const sortedY = Object.keys(lines).sort((a, b) => b - a);
+            
             let currentParaRuns = [];
             let lastY = null;
+
             for (let y of sortedY) {
-                const rowText = lines[y].sort((a, b) => a.transform[4] - b.transform[4]).map(item => item.str).join('');
+                const rowText = lines[y].sort((a, b) => a.transform[4] - b.transform[4])
+                                       .map(item => item.str).join('');
+                
                 if (rowText.trim().length === 0) continue;
+
                 const currentY = parseFloat(y);
                 if (lastY !== null && Math.abs(lastY - currentY) > 20) {
-                    allDocChildren.push(new docx.Paragraph({ children: currentParaRuns, spacing: { after: 120 } }));
+                    allDocChildren.push(new docx.Paragraph({
+                        children: currentParaRuns,
+                        spacing: { after: 120 }
+                    }));
                     currentParaRuns = [];
                 }
+                
                 currentParaRuns.push(new docx.TextRun({ text: rowText, font: "MS Mincho" }));
                 lastY = currentY;
             }
-            if (currentParaRuns.length > 0) allDocChildren.push(new docx.Paragraph({ children: currentParaRuns, spacing: { after: 120 } }));
-            if (i < pdf.numPages) allDocChildren.push(new docx.Paragraph({ children: [new docx.PageBreak()] }));
-            const mainBar = document.getElementById('mainBar');
-            if (mainBar) mainBar.value = (i / pdf.numPages) * 100;
+
+            if (currentParaRuns.length > 0) {
+                allDocChildren.push(new docx.Paragraph({
+                    children: currentParaRuns,
+                    spacing: { after: 120 }
+                }));
+            }
+
+            if (i < pdf.numPages) {
+                allDocChildren.push(new docx.Paragraph({ children: [new docx.PageBreak()] }));
+            }
+            document.getElementById('mainBar').value = (i / pdf.numPages) * 100;
         }
-        const doc = new docx.Document({ sections: [{ properties: {}, children: allDocChildren }] });
+
+        const doc = new docx.Document({
+            sections: [{ properties: {}, children: allDocChildren }]
+        });
+
         const blob = await docx.Packer.toBlob(doc);
-        uiDone("完了！", `<a href="${URL.createObjectURL(blob)}" download="${file.name.replace('.pdf', '.docx')}" class="btn">Wordを保存</a>`);
+        uiDone("リベンジ完了！", `<a href="${URL.createObjectURL(blob)}" download="${file.name.replace('.pdf', '.docx')}" class="btn">Wordを保存</a>`);
     } catch (err) { 
         console.error(err);
         alert("変換エラー: " + err.message); 
@@ -172,7 +182,10 @@ document.getElementById('toMerge').addEventListener('change', async (e) => {
         }
         const blob = new Blob([await merged.save()], { type: 'application/pdf' });
         uiDone("結合完了！", `<a href="${URL.createObjectURL(blob)}" download="merged.pdf" class="btn">結合PDFを保存</a>`);
-    } catch (err) { console.error(err); alert(err.message); }
+    } catch (err) { 
+        console.error(err);
+        alert(err.message); 
+    }
 });
 
 // ④ 匿名化
@@ -184,5 +197,8 @@ document.getElementById('toClean').addEventListener('change', async (e) => {
         doc.setTitle(''); doc.setAuthor(''); doc.setSubject(''); doc.setCreator(''); doc.setProducer('');
         const blob = new Blob([await doc.save()], { type: 'application/pdf' });
         uiDone("完了！", `<a href="${URL.createObjectURL(blob)}" download="cleaned.pdf" class="btn">保存</a>`);
-    } catch (err) { console.error(err); alert(err.message); }
+    } catch (err) { 
+        console.error(err);
+        alert(err.message); 
+    }
 });
