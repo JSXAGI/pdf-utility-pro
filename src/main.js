@@ -9,6 +9,8 @@ import JSZip from 'jszip';
 // 【エラー完全回避のコア設定】
 const pdfjsLib = pdfjsModule.default || pdfjsModule;
 if (typeof window !== 'undefined') window.pdfjsWorker = null;
+
+// PDF.js v4系向けのWorker完全無効化設定
 pdfjsLib.GlobalWorkerOptions.workerSrc = '';
 pdfjsLib.GlobalWorkerOptions.workerPort = null;
 pdfjsLib.disableWorker = true;
