@@ -6,23 +6,11 @@ import { PDFDocument } from 'pdf-lib';
 import * as docx from 'docx';
 import JSZip from 'jszip';
 
-// 【v4系対応：設定の修正】
+// 【v4系対応：Worker の正しい設定】
 const pdfjsLib = pdfjsModule.default || pdfjsModule;
 
-// 1. Workerの設定は、GlobalWorkerOptionsに直接代入するのではなく
-//    pdfjsLibの設定を介さずに、以下のように処理します
-if (typeof window !== 'undefined') {
-    window.pdfjsWorker = null;
-}
-
-// 2. もしdisableWorkerが書き込み不可なら、try-catchで囲んで
-//    「警告を無視して」設定を試みる（または設定そのものをスキップする）
-try {
-    pdfjsLib.GlobalWorkerOptions.workerSrc = '';
-    pdfjsLib.disableWorker = true;
-} catch (e) {
-    console.log("Worker設定は読み取り専用ですが、環境により自動的にメインスレッドで動作します");
-}
+// Worker ファイルの場所を正しく指定
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://esm.run/pdfjs-dist@4.4.168/build/pdf.worker.min.mjs';
 
 // ==========================================
 // 2. 共通のUI制御関数
@@ -123,7 +111,7 @@ document.getElementById('toWord').addEventListener('change', async (e) => {
         for (let i = 1; i <= pdf.numPages; i++) {
             const page = await pdf.getPage(i);
             const textContent = await page.getTextContent();
-            
+
             const lines = {};
             textContent.items.forEach(item => {
                 const y = Math.round(item.transform[5] / 5) * 5;
@@ -132,14 +120,14 @@ document.getElementById('toWord').addEventListener('change', async (e) => {
             });
 
             const sortedY = Object.keys(lines).sort((a, b) => b - a);
-            
+
             let currentParaRuns = [];
             let lastY = null;
 
             for (let y of sortedY) {
                 const rowText = lines[y].sort((a, b) => a.transform[4] - b.transform[4])
                                        .map(item => item.str).join('');
-                
+
                 if (rowText.trim().length === 0) continue;
 
                 const currentY = parseFloat(y);
@@ -150,7 +138,7 @@ document.getElementById('toWord').addEventListener('change', async (e) => {
                     }));
                     currentParaRuns = [];
                 }
-                
+
                 currentParaRuns.push(new docx.TextRun({ text: rowText, font: "MS Mincho" }));
                 lastY = currentY;
             }
