@@ -64,35 +64,62 @@ document.getElementById('toImage').addEventListener('change', async (e) => {
 
     try {
         const pdf = await pdfjsLib.getDocument(await file.arrayBuffer()).promise;
-        for (let i = 1; i <= pdf.numPages; i++) {
-            const page = await pdf.getPage(i);
-            const viewport = page.getViewport({ scale: 2.0 });
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            canvas.height = viewport.height; canvas.width = viewport.width;
-            await page.render({ canvasContext: ctx, viewport }).promise;
+        let successCount = 0;
 
-            if (logoImg) {
-                const lw = viewport.width * 0.15;
-                const lh = (logoImg.height / logoImg.width) * lw;
-                ctx.globalAlpha = 0.5;
-                ctx.drawImage(logoImg, viewport.width - lw - 20, viewport.height - lh - 20, lw, lh);
+        for (let i = 1; i <= pdf.numPages; i++) {
+            try {
+                const page = await pdf.getPage(i);
+                const viewport = page.getViewport({ scale: 2.0 });
+                
+                // Canvas が正しく作成されるか確認
+                const canvas = document.createElement('canvas');
+                if (!canvas) throw new Error('Canvas element could not be created');
+                
+                const ctx = canvas.getContext('2d');
+                if (!ctx) throw new Error('2D context could not be obtained');
+                
+                canvas.height = viewport.height;
+                canvas.width = viewport.width;
+                
+                await page.render({ canvasContext: ctx, viewport }).promise;
+
+                if (logoImg) {
+                    const lw = viewport.width * 0.15;
+                    const lh = (logoImg.height / logoImg.width) * lw;
+                    ctx.globalAlpha = 0.5;
+                    ctx.drawImage(logoImg, viewport.width - lw - 20, viewport.height - lh - 20, lw, lh);
+                }
+
+                const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
+                const url = URL.createObjectURL(blob);
+                const fileName = `image_page_${i}.png`;
+                zip.file(fileName, blob);
+
+                const div = document.createElement('div');
+                div.className = 'img-card';
+                div.innerHTML = `<img src="${url}"><br><a href="${url}" download="${fileName}" class="btn btn-sub btn-small">保存</a>`;
+                gallery.appendChild(div);
+                successCount++;
+
+            } catch (pageErr) {
+                console.warn(`ページ ${i} の処理に失敗: ${pageErr.message}`);
+                const div = document.createElement('div');
+                div.className = 'img-card';
+                div.innerHTML = `<p style="color: red;">ページ ${i}: エラー</p><p>${pageErr.message}</p>`;
+                gallery.appendChild(div);
             }
 
-            const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
-            const url = URL.createObjectURL(blob);
-            const fileName = `image_page_${i}.png`;
-            zip.file(fileName, blob);
-
-            const div = document.createElement('div');
-            div.className = 'img-card';
-            div.innerHTML = `<img src="${url}"><br><a href="${url}" download="${fileName}" class="btn btn-sub btn-small">保存</a>`;
-            gallery.appendChild(div);
             document.getElementById('mainBar').value = (i / pdf.numPages) * 100;
         }
+
+        if (successCount === 0) {
+            alert("エラー: ページを処理できませんでした");
+            return;
+        }
+
         const zipContent = await zip.generateAsync({ type: "blob", compression: "DEFLATE", compressionOptions: { level: 6 } });
         const zipUrl = URL.createObjectURL(zipContent);
-        uiDone("完了！", `<a href="${zipUrl}" download="pdf_images.zip" class="btn">まとめて保存 (ZIP)</a>`);
+        uiDone(`完了！（${successCount}/${pdf.numPages}ページ）`, `<a href="${zipUrl}" download="pdf_images.zip" class="btn">まとめて保存 (ZIP)</a>`);
         document.getElementById('preview-section').style.display = 'block';
     } catch (err) { 
         console.error(err);
